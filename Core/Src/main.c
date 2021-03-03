@@ -1,21 +1,21 @@
 /* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
-  * @file           : main.c
-  * @brief          : Main program body
-  ******************************************************************************
-  * @attention
-  *
-  * <h2><center>&copy; Copyright (c) 2021 STMicroelectronics.
-  * All rights reserved.</center></h2>
-  *
-  * This software component is licensed by ST under BSD 3-Clause license,
-  * the "License"; You may not use this file except in compliance with the
-  * License. You may obtain a copy of the License at:
-  *                        opensource.org/licenses/BSD-3-Clause
-  *
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * @file           : main.c
+ * @brief          : Main program body
+ ******************************************************************************
+ * @attention
+ *
+ * <h2><center>&copy; Copyright (c) 2021 STMicroelectronics.
+ * All rights reserved.</center></h2>
+ *
+ * This software component is licensed by ST under BSD 3-Clause license,
+ * the "License"; You may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at:
+ *                        opensource.org/licenses/BSD-3-Clause
+ *
+ ******************************************************************************
+ */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
@@ -45,16 +45,19 @@ ADC_HandleTypeDef hadc1;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
+uint16_t adcdata[2] = { 0 };
 
-uint16_t ADCData[2] = {0};
+typedef struct {
+	ADC_ChannelConfTypeDef Config;
+	uint16_t data;
+} ADCStructure;
 
-  typedef struct
-  {
-  	ADC_ChannelConfTypeDef Config;
-  	uint16_t data;
-  } ADCStructure;
+ADCStructure ADCChannel[3] = { 0 };
+uint8_t ADCMode = 0;
+uint8_t CheckButton[2] = {};
+uint32_t TimeStamp = 0;
+float ADCOutputCoverted = 0;
 
-ADCStructure ADCChannel[3] = {0};
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -89,7 +92,6 @@ int main(void)
 
   /* USER CODE BEGIN Init */
 
-
   /* USER CODE END Init */
 
   /* Configure the system clock */
@@ -104,20 +106,47 @@ int main(void)
   MX_USART2_UART_Init();
   MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
+	ADCPollingMethodInit();
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  while (1)
-  {
+	while (1) {
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
 
-	  ADCPollingMethodUpdate();
+		ADCPollingMethodUpdate();
 
-  }
+		if (HAL_GetTick() - TimeStamp >= 100)
+		{
+			TimeStamp = HAL_GetTick();
+			CheckButton[0] = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_10);
+			if (CheckButton[0] == 0 && CheckButton[1] == 1)
+			{
+				if (ADCMode == 0)
+				{
+					ADCMode = 1;
+				}
+				else if (ADCMode == 1)
+				{
+					ADCMode = 0;
+				}
+			}
+			CheckButton[1] = CheckButton[0];
+		}
+
+		if (ADCMode == 0)
+		{
+			ADCOutputCoverted = ((ADCChannel[0].data * 3.3 * 1000.0) / 4096.0);
+		}
+		else if (ADCMode == 1)
+		{
+			ADCOutputCoverted = ((((ADCChannel[2].data * 3.3 / 4096.0) - 0.76) / 0.0025) + 25.0);
+		}
+	}
   /* USER CODE END 3 */
 }
 
@@ -279,6 +308,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
 
+  /*Configure GPIO pin : PB10 */
+  GPIO_InitStruct.Pin = GPIO_PIN_10;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
 }
 
 /* USER CODE BEGIN 4 */
@@ -300,10 +335,15 @@ void ADCPollingMethodInit() {
 void ADCPollingMethodUpdate() {
 	//Read all 3 Channel
 	for (int i = 0; i < 3; i++) {
+		// Select Channel
 		HAL_ADC_ConfigChannel(&hadc1, &ADCChannel[i].Config);
+		// Convert , Sampling
 		HAL_ADC_Start(&hadc1);
+		// Wait ADC
 		HAL_ADC_PollForConversion(&hadc1, 10);
+		// Get Value
 		ADCChannel[i].data = HAL_ADC_GetValue(&hadc1);
+		// Stop
 		HAL_ADC_Stop(&hadc1);
 	}
 }
@@ -316,11 +356,10 @@ void ADCPollingMethodUpdate() {
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
-  __disable_irq();
-  while (1)
-  {
-  }
+	/* User can add his own implementation to report the HAL error return state */
+	__disable_irq();
+	while (1) {
+	}
   /* USER CODE END Error_Handler_Debug */
 }
 

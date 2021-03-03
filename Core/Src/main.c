@@ -46,7 +46,7 @@ UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 
-uint16_t adcdata[2] = {0};
+uint16_t ADCData[2] = {0};
 
   typedef struct
   {
